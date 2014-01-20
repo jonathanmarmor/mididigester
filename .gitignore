@@ -39,3 +39,6 @@ nosetests.xml
 *.wav
 *.mp3
 *.aiff
+*.mid
+*.midi
+output
