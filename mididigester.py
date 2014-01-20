@@ -112,8 +112,11 @@ class Digest(object):
         midi_file = '{}/midi-{}.mid'.format(output_dir, depth)
         to_midi(audio_file, midi_file)
         depth += 1
+        audio_file_pre_trim = '{}/audio-{}-pre-trim.wav'.format(output_dir, depth)
         audio_file = '{}/audio-{}.wav'.format(output_dir, depth)
-        os.system('timidity -Ow -o {} {}'.format(audio_file, midi_file))
+        os.system('timidity --volume-compensation -EFreverb=d -Ow -o {} {}'.format(audio_file_pre_trim, midi_file))
+        # Trim silence off the end
+        os.system('sox {} {} silence 1 0.1 0.1% reverse silence 1 0.1 0.1% reverse'.format(audio_file_pre_trim, audio_file))
         if depth <= self.limit:
             self.process(audio_file, depth=depth)
         else:
