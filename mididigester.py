@@ -4,11 +4,10 @@
 
 """
 
-import sys
 from math import pow
 from datetime import datetime
 import os
-import time
+import argparse
 
 import echonest.remix.audio as audio
 from echonest.remix.support.midi.MidiOutFile import MidiOutFile
@@ -26,7 +25,7 @@ def to_midi(input_filename, output_filename):
     midi.tempo(int(60000000.00 / 60.0)) # 60 BPM, one Q per second, 96 ticks per Q, 96 ticks per second.)
     BOOST = 30 # Boost volumes if you want
 
-    # Do you want the channels to be split by timbre or no? 
+    # Do you want the channels to be split by timbre or no?
     splitChannels = True
 
     for seg_index in xrange(len(a.segments)):
@@ -41,7 +40,7 @@ def to_midi(input_filename, output_filename):
             channel = bits[0]*8 + bits[1]*4 + bits[2]*2 + bits[3]*1
         else:
             channel = 0
-    
+
         # Get the loudnesses in MIDI cc #7 vals for the start of the segment, the loudest part, and the start of the next segment.
         # db -> voltage ratio http://www.mogami.com/e/cad/db.html
         linearMaxVolume = int(pow(10.0,s.loudness_max/20.0)*127.0)+BOOST
@@ -54,17 +53,17 @@ def to_midi(input_filename, output_filename):
 
         # Count the # of ticks I wait in doing the volume ramp so I can fix up rounding errors later.
         tt = 0
-        
+
         # take pitch vector and hit a note on for each pitch at its relative volume. That's 12 notes per segment.
         for note in xrange(12):
             volume = int(s.pitches[note]*127.0)
             midi.update_time(0)
             midi.note_on(channel=channel, note=0x3C+note, velocity=volume)
         midi.update_time(0)
-        
+
         # Set volume of this segment. Start at the start volume, ramp up to the max volume , then ramp back down to the next start volume.
         curVol = float(linearStartVolume)
-        
+
         # Do the ramp up to max from start
         ticksToMaxLoudnessFromHere = int(96.0 * whenMaxVolume)
         if(ticksToMaxLoudnessFromHere > 0):
@@ -74,7 +73,7 @@ def to_midi(input_filename, output_filename):
                 curVol = curVol + howMuchVolumeToIncreasePerTick
                 tt = tt + 1
                 midi.update_time(1)
-        
+
         # Now ramp down from max to start of next seg
         ticksToNextSegmentFromHere = int(96.0 * (s.duration-whenMaxVolume))
         if(ticksToNextSegmentFromHere > 0):
@@ -96,30 +95,39 @@ def to_midi(input_filename, output_filename):
             midi.update_time(0)
 
     midi.update_time(0)
-    midi.end_of_track() 
+    midi.end_of_track()
     midi.eof()
 
 
-DURATION = 7.66
-LIMIT = 100
+class Digest(object):
+    def __init__(self, audio_file, output_dir, limit):
+        self.output_dir = output_dir
+        self.limit = limit
+        self.audio_files = []
+        self.process(audio_file)
 
-def main(audio_file, output_dir, depth=0):
-    print '\nDoing #{}'.format(depth)
-    midi_file = '{}/midi-{}.mid'.format(output_dir, depth)
-    to_midi(audio_file, midi_file)
-    depth += 1
-    audio_file = '{}/audio-{}.wav'.format(output_dir, depth)
-    os.system('open {}'.format(midi_file))
-    os.system('rec {} vol 24dB trim 0 {}'.format(audio_file, DURATION))
-    time.sleep(2)
-    if depth <= LIMIT:
-        main(audio_file, output_dir, depth=depth)
-    else:
-        files = ' '.join(['{}/audio-{}.wav'.format(output_dir, n) for n in range(1, depth)])
-        os.system('sox {} {}/final.wav'.format(files, output_dir))
-    
+    def process(self, audio_file, depth=0):
+        print '\nDoing #{}'.format(depth)
+        self.audio_files.append('"{}"'.format(audio_file))
+        midi_file = '{}/midi-{}.mid'.format(output_dir, depth)
+        to_midi(audio_file, midi_file)
+        depth += 1
+        audio_file = '{}/audio-{}.wav'.format(output_dir, depth)
+        os.system('timidity -Ow -o {} {}'.format(audio_file, midi_file))
+        if depth <= self.limit:
+            self.process(audio_file, depth=depth)
+        else:
+            files = ' '.join(self.audio_files)
+            os.system('sox {} {}/final.wav'.format(files, output_dir))
+
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('audio_file')
+    parser.add_argument('--limit', '-l', dest='limit', default=10)
+    args = parser.parse_args()
+
     output_dir = 'output/{}'.format(datetime.utcnow().strftime('%Y%m%d_%H%M%S'))
     os.system('mkdir -p {}'.format(output_dir))
-    main(sys.argv[1], output_dir=output_dir)
+
+    Digest(args.audio_file, output_dir, int(args.limit))

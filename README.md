@@ -9,3 +9,19 @@ The [Echo Nest Remix API](http://echonest.github.io/remix/) comes with a demo, [
 MIDI Digester is a [very small script](https://github.com/jonathanmarmor/mididigester) that runs audio through enToMIDI, plays back the resulting MIDI using Quicktime and its built in piano synthesizer, records the audio with [sox](http://sox.sourceforge.net/), then repeats the process as many times as you want. Each repetition strips away more of the original musical material and accumulates the sound of enToMIDI.
 
 Check out [this demo](https://soundcloud.com/jonathanmarmor/groundhog) which "digests" a 7.66 second excerpt of the traditional bluegrass tune "The Groundhog" played by the same Quicktime piano synthesizer.
+
+
+## Install Dependencies
+
+Install numpy and The Echo Nest Remix API Python library:
+
+    pip install -r requirements.txt
+
+Install ffmpeg:
+
+    brew install ffmpeg
+    sudo ln -s `which ffmpeg` /usr/local/bin/en-ffmpeg
+
+## Run it
+
+    ./mididigester <input wav audio file> [<recursion depth>]
