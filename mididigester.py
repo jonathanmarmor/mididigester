@@ -104,24 +104,33 @@ class Digest(object):
         self.output_dir = output_dir
         self.limit = limit
         self.audio_files = []
+        self.to_delete = []
+        self.original_audio = audio_file
         self.process(audio_file)
 
     def process(self, audio_file, depth=0):
         print '\nDoing #{}'.format(depth)
         self.audio_files.append('"{}"'.format(audio_file))
         midi_file = '{}/midi-{}.mid'.format(output_dir, depth)
+        self.to_delete.extend([audio_file, midi_file])
         to_midi(audio_file, midi_file)
         depth += 1
         audio_file_pre_trim = '{}/audio-{}-pre-trim.wav'.format(output_dir, depth)
-        audio_file = '{}/audio-{}.wav'.format(output_dir, depth)
+        self.to_delete.append(audio_file_pre_trim)
         os.system('timidity --volume-compensation -EFreverb=d -Ow -o {} {}'.format(audio_file_pre_trim, midi_file))
+        audio_file = '{}/audio-{}.wav'.format(output_dir, depth)
         # Trim silence off the end
         os.system('sox {} {} silence 1 0.1 0.1% reverse silence 1 0.1 0.1% reverse'.format(audio_file_pre_trim, audio_file))
         if depth <= self.limit:
             self.process(audio_file, depth=depth)
         else:
+            self.to_delete.append(audio_file)
             files = ' '.join(self.audio_files)
-            os.system('sox {} {}/final.wav'.format(files, output_dir))
+            orig_name, _ = os.path.splitext(os.path.basename(self.original_audio))
+            os.system('sox {} {}_{}_depth_{}.wav'.format(files, output_dir, orig_name, self.limit))
+            os.system('rm {}'.format(' '.join(self.to_delete)))
+            os.system('rmdir {}'.format(self.output_dir))
+
 
 
 if __name__ == '__main__':
