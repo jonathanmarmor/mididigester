@@ -109,28 +109,29 @@ class Digest(object):
         self.process(audio_file)
 
     def process(self, audio_file, depth=0):
-        print '\nDoing #{}'.format(depth)
+        print
+        print '=' * 10, '#{}'.format(depth), '=' * 10
         self.audio_files.append('"{}"'.format(audio_file))
-        midi_file = '{}/midi-{}.mid'.format(output_dir, depth)
-        self.to_delete.extend([audio_file, midi_file])
+        midi_file = '{}/midi-{}.mid'.format(self.output_dir, depth)
         to_midi(audio_file, midi_file)
         depth += 1
-        audio_file_pre_trim = '{}/audio-{}-pre-trim.wav'.format(output_dir, depth)
-        self.to_delete.append(audio_file_pre_trim)
+        audio_file_pre_trim = '{}/audio-{}-pre-trim.wav'.format(self.output_dir, depth)
         os.system('timidity --volume-compensation -EFreverb=d -Ow -o {} {}'.format(audio_file_pre_trim, midi_file))
-        audio_file = '{}/audio-{}.wav'.format(output_dir, depth)
-        # Trim silence off the end
+        audio_file = '{}/audio-{}.wav'.format(self.output_dir, depth)
+        # Trim silence
         os.system('sox {} {} silence 1 0.1 0.1% reverse silence 1 0.1 0.1% reverse'.format(audio_file_pre_trim, audio_file))
+        self.to_delete.extend([midi_file, audio_file_pre_trim, audio_file])
         if depth <= self.limit:
             self.process(audio_file, depth=depth)
         else:
-            self.to_delete.append(audio_file)
-            files = ' '.join(self.audio_files)
+            # Join the audio files
+            audio_to_join = ' '.join(self.audio_files)
             orig_name, _ = os.path.splitext(os.path.basename(self.original_audio))
-            os.system('sox {} {}_{}_depth_{}.wav'.format(files, output_dir, orig_name, self.limit))
-            os.system('rm {}'.format(' '.join(self.to_delete)))
+            sox_join_cmd = 'sox {} "{}_{}_depth_{}.wav"'.format(audio_to_join, self.output_dir, orig_name, self.limit)
+            os.system(sox_join_cmd)
+            # Remove temp files
+            os.system('rm {}'.format(' '.join(['"{}"'.format(f) for f in self.to_delete])))
             os.system('rmdir {}'.format(self.output_dir))
-
 
 
 if __name__ == '__main__':
